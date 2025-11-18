@@ -1,21 +1,55 @@
-// Trivy container image vulnerability & misconfig scanner
-// Example: trivy image --severity HIGH,CRITICAL myimage:tag
-import { exec } from 'child_process';
+import chalk from 'chalk';
+import path from 'path';
+import { loadDockerfiles, extractPackageInstalls } from '../../utils/dockerfile.js';
 
-interface TrivyOptions {
-  image: string;
-  severity?: string; // e.g., 'HIGH,CRITICAL'
-  options?: string;
-}
+const EOL_BASES = [
+  { pattern: /^ubuntu:(12\.04|14\.04|16\.04|18\.04)/i, severity: 'CRITICAL', message: 'Ubuntu release is out of support.' },
+  { pattern: /^debian:(jessie|stretch)/i, severity: 'HIGH', message: 'Debian release is EOL.' },
+  { pattern: /^alpine:(3\.1[0-2]|3\.13)/i, severity: 'HIGH', message: 'Alpine release no longer receives patches.' },
+  { pattern: /^centos:(6|7)/i, severity: 'CRITICAL', message: 'CentOS release reached end-of-life.' },
+];
 
-export function runTrivy({ image, severity, options }: TrivyOptions): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let cmd = `trivy image ${image}`;
-    if (severity) cmd += ` --severity ${severity}`;
-    if (options) cmd += ` ${options}`;
-    exec(cmd, (err, stdout, stderr) => {
-      if (err) return reject(stderr || err.message);
-      resolve(stdout);
+const HIGH_RISK_PACKAGES = ['openssl', 'glibc', 'bash', 'sudo', 'curl', 'wget', 'python2', 'log4j'];
+
+export async function run(targetDir = process.cwd()): Promise<void> {
+  console.log(chalk.blue('🛡️ Evaluating Dockerfiles with Trivy-style heuristics...'));
+  const dockerfiles = await loadDockerfiles(targetDir);
+  if (dockerfiles.length === 0) {
+    console.log(chalk.yellow('No Dockerfiles found to scan.'));
+    return;
+  }
+
+  const findings: string[] = [];
+
+  dockerfiles.forEach((meta) => {
+    const ref = formatRef(targetDir, meta.path);
+    meta.baseImages.forEach((base) => {
+      const hit = EOL_BASES.find((entry) => entry.pattern.test(base));
+      if (hit) {
+        findings.push(`${ref}: [${hit.severity}] ${hit.message} (${base}).`);
+      }
+    });
+
+    const packages = extractPackageInstalls(meta);
+    packages.forEach((pkg) => {
+      if (HIGH_RISK_PACKAGES.some((name) => pkg.package.toLowerCase().startsWith(name))) {
+        findings.push(`${ref}: ${pkg.manager} installs ${pkg.package} (line ${pkg.line}); verify patched CVEs.`);
+      }
+      if (!pkg.versionPinned && ['apt', 'apk', 'yum', 'dnf'].includes(pkg.manager)) {
+        findings.push(`${ref}: ${pkg.manager} installs ${pkg.package} without a fixed version (line ${pkg.line}).`);
+      }
     });
   });
+
+  if (findings.length === 0) {
+    console.log(chalk.green('Trivy heuristics detected no obvious misconfigurations.'));
+    return;
+  }
+
+  findings.forEach((finding) => console.log(`- ${finding}`));
+}
+
+function formatRef(targetDir: string, filePath: string): string {
+  const relative = path.relative(targetDir, filePath);
+  return relative && !relative.startsWith('..') ? relative : path.basename(filePath);
 }

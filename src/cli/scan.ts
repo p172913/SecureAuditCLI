@@ -24,6 +24,10 @@ const SCANNER_CATEGORIES: Record<string, CategoryConfig> = {
     dir: 'code',
     scanners: ['codeComplexity', 'codeVulnerability', 'dependencyLicense', 'outdatedDependencies', 'secretScan'],
   },
+  docker: {
+    dir: 'DockerImages',
+    scanners: ['anchore_cli', 'clair', 'cosign', 'dockle', 'grype', 'hadolint', 'snyk', 'syft', 'trivy'],
+  },
   repo: {
     dir: 'GitRepoScans',
     scanners: ['Gitleaks', 'TruffleHog', 'detect-secrets'],
@@ -98,6 +102,7 @@ Object.entries(SCANNER_CATEGORIES).forEach(([category, config]) => {
 function prettyHeader(scanner: string, category: string) {
   const emoji = {
     repo: '🔑',
+    docker: '🐳',
     images: '🖼️',
     local: '🖥️',
     code: '💻',

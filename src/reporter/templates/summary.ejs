@@ -1,0 +1,8 @@
+<section>
+  <h2>Summary</h2>
+  <ul>
+    <% Object.entries(summary).forEach(([k, v]) => { %>
+      <li><strong><%= k %>:</strong> <%= v %></li>
+    <% }) %>
+  </ul>
+</section>

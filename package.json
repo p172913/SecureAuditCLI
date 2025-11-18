@@ -1,0 +1,43 @@
+{
+  "name": "secaudithubcli",
+  "version": "1.0.0",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "secaudithub": "dist/cli/index.js"
+  },
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc --project tsconfig.json",
+    "build:watch": "tsc --project tsconfig.json --watch",
+    "cli": "node dist/cli/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "type": "module",
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
+    "eslint": "^9.39.1",
+    "jest": "^30.2.0",
+    "prettier": "^3.6.2",
+    "rimraf": "^6.1.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "chalk": "^5.6.2",
+    "commander": "^14.0.2",
+    "ejs": "^3.1.10",
+    "execa": "^9.6.0",
+    "fs-extra": "^11.3.2",
+    "ora": "^9.0.0",
+    "puppeteer": "^24.30.0",
+    "undici": "^6.19.8"
+  }
+}

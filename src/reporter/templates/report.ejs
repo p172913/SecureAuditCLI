@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SecAuditHub Security Report</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7f7fc; padding: 2rem; }
+    h1 { color: #2d4575; }
+    table { border-collapse: collapse; width: 100%; margin-top: 2rem; }
+    th, td { border: 1px solid #e2e2ee; padding: 10px; }
+    th { background: #e8eefc; }
+    .severity-high { color: #c44532; font-weight: bold; }
+    .severity-medium { color: #c4a732; }
+    .severity-low { color: #3280c4; }
+  </style>
+</head>
+<body>
+  <h1>SecAuditHub Security Report</h1>
+  <p><strong>Scan Date:</strong> <%= data.date || new Date().toLocaleString() %></p>
+  <% if (data.summary) { %>
+    <section>
+      <h2>Summary</h2>
+      <ul>
+        <% Object.entries(data.summary).forEach(([k, v]) => { %>
+          <li><%= k %>: <%= v %></li>
+        <% }) %>
+      </ul>
+    </section>
+  <% } %>
+  <section>
+    <h2>Findings</h2>
+    <% if (data.issues && data.issues.length) { %>
+      <table>
+        <tr>
+          <th>ID</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Severity</th>
+        </tr>
+        <% data.issues.forEach(issue => { %>
+          <tr>
+            <td><%= issue.id || '-' %></td>
+            <td><%= issue.type || '-' %></td>
+            <td><%= issue.description || '-' %></td>
+            <td class="severity-<%= (issue.severity || '').toLowerCase() %>"><%= issue.severity || 'info' %></td>
+          </tr>
+        <% }) %>
+      </table>
+    <% } else { %>
+      <p>No issues found 🎉</p>
+    <% } %>
+  </section>
+</body>
+</html>

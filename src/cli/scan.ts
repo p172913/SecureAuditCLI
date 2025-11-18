@@ -2,26 +2,52 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import * as path from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { runAllWebScanners, runWebScannerById, getWebScannerIds } from '../scanners/WebScanners/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+if (process.argv[2] === 'scan') {
+  process.argv.splice(2, 1);
+}
 
 const program = new Command();
 
-const SCANNER_CATEGORIES: Record<string, string[]> = {
-  repo: ['Gitleaks', 'TruffleHog', 'detect-secrets'],
-  images: ['scanMalware', 'scanIntegrity', 'scanMetadata', 'scanNSFW', 'scanStego'],
-  web: getWebScannerIds(),
-  // add other categories as discovered, following src/scanners
+type CategoryConfig = {
+  dir: string;
+  scanners: string[];
+};
+
+const SCANNER_CATEGORIES: Record<string, CategoryConfig> = {
+  code: {
+    dir: 'code',
+    scanners: ['codeComplexity', 'codeVulnerability', 'dependencyLicense', 'outdatedDependencies', 'secretScan'],
+  },
+  repo: {
+    dir: 'GitRepoScans',
+    scanners: ['Gitleaks', 'TruffleHog', 'detect-secrets'],
+  },
+  images: {
+    dir: 'ImagesScans',
+    scanners: ['scanMalware', 'scanIntegrity', 'scanMetadata', 'scanNSFW', 'scanStego'],
+  },
+  web: {
+    dir: 'WebScanners',
+    scanners: getWebScannerIds(),
+  },
+  // Extend with additional categories as needed
 };
 
 // For each category, create subcommands dynamically
-Object.entries(SCANNER_CATEGORIES).forEach(([category, scanners]) => {
+Object.entries(SCANNER_CATEGORIES).forEach(([category, config]) => {
   if (category === 'web') {
     program
       .command(`${category} [scanner]`)
       .option('--all', 'Run all scanners in the web category')
       .description('Run a web scanner or all web scanners')
       .argument('<url>', 'Target URL for the scan')
-      .action(async (scanner: string | undefined, options: any, url: string) => {
+      .action(async (scanner: string | undefined, url: string, options: any) => {
         try {
           if (!url) {
             throw new Error('URL argument is required for web scans.');
@@ -44,29 +70,22 @@ Object.entries(SCANNER_CATEGORIES).forEach(([category, scanners]) => {
     .option('--all', `Run all scanners in the ${category} category`)
     .description(`Run a ${category} scanner or all scanners in that category`)
     .argument('[target]', 'Target file/folder for the scan (as needed)')
-    .action(async (scanner: string | undefined, options: any, target: string | undefined) => {
+    .action(async (scanner: string | undefined, target: string | undefined, options: any) => {
       try {
         if (options.all || !scanner) {
           // Run all scanners in the category
-          for (const s of scanners) {
-            const modPath = path.resolve(
-              __dirname,
-              '../scanners',
-              `${capitalize(category)}Scans`,
-              s + '.ts',
-            );
+          for (const s of config.scanners) {
+            const modPath = resolveScannerModule(config.dir, s);
             prettyHeader(s, category);
             await runModule(modPath, target);
           }
         } else {
-          // Run specific scanner
-          const modPath = path.resolve(
-            __dirname,
-            '../scanners',
-            `${capitalize(category)}Scans`,
-            scanner + '.ts',
-          );
-          prettyHeader(scanner, category);
+          const resolved = resolveScannerName(config.scanners, scanner);
+          if (!resolved) {
+            throw new Error(`Unknown ${category} scanner: ${scanner}. Available: ${config.scanners.join(', ')}`);
+          }
+          const modPath = resolveScannerModule(config.dir, resolved);
+          prettyHeader(resolved, category);
           await runModule(modPath, target);
         }
       } catch (err) {
@@ -75,10 +94,6 @@ Object.entries(SCANNER_CATEGORIES).forEach(([category, scanners]) => {
       }
     });
 });
-
-function capitalize(str: string) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
 
 function prettyHeader(scanner: string, category: string) {
   const emoji = {
@@ -92,10 +107,19 @@ function prettyHeader(scanner: string, category: string) {
   console.log(chalk.bgBlueBright(`\n${emoji} [${category}/${scanner}] Running scanner...\n`));
 }
 
+function resolveScannerName(scanners: string[], requested: string): string | undefined {
+  return scanners.find((scanner) => scanner.toLowerCase() === requested.toLowerCase());
+}
+
+function resolveScannerModule(dir: string, scanner: string): string {
+  return path.resolve(__dirname, '../scanners', dir, `${scanner}.js`);
+}
+
 async function runModule(modulePath: string, arg?: string) {
   try {
     // Dynamically import and execute 'run' method or default behavior
-    const mod = await import(modulePath.replace(/\\/g, '/'));
+    const moduleUrl = pathToFileURL(modulePath).href;
+    const mod = await import(moduleUrl);
     if (typeof mod.run === 'function') {
       await mod.run(arg);
     } else {

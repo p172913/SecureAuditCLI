@@ -6,6 +6,7 @@ import { runAllWebScanners, runWebScannerById, getWebScannerIds } from '../scann
 
 const args = process.argv.slice(2);
 const command = args[0];
+const SCAN_FORWARD_COMMANDS = new Set(['code', 'repo', 'images', 'local', 'cloud']);
 
 function extractOptionValue(longFlag: string, shortFlag?: string): string | undefined {
   for (let i = 0; i < args.length; i += 1) {
@@ -51,6 +52,11 @@ async function main() {
   }
 
   if (!command || command === 'scan') {
+    await import('./scan.js');
+    return;
+  }
+
+  if (SCAN_FORWARD_COMMANDS.has(command)) {
     await import('./scan.js');
     return;
   }
